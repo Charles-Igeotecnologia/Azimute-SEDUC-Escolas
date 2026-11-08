@@ -676,7 +676,17 @@ h1 { margin: 0; font-size: 1.25rem; line-height: 1.1; letter-spacing: .07em; }
 .subtitle, label, #status { font-size: .75rem; color: var(--muted); }
 form { display: flex; align-items: end; gap: 8px; flex: 1 1 490px; min-width: 0; margin: 0; max-width: 640px; }
 .field { display: grid; gap: 4px; }
-.search { flex: 1; min-width: 0; }
+.search { flex: 1; min-width: 0; position: relative; }
+.school-suggestions {
+  position: absolute; top: calc(100% + 4px); left: 0; width: min(340px, calc(100vw - 24px));
+  z-index: 1; max-height: min(280px, 40vh); overflow: auto; overscroll-behavior: contain;
+  margin: 0; padding: 4px; list-style: none; background: #fff;
+  border: 1px solid #a6b8c0; border-radius: 6px; box-shadow: 0 4px 12px #18374524;
+}
+.school-suggestions li { padding: 7px 9px; border-radius: 4px; cursor: pointer; font-size: .85rem; }
+.school-suggestions li + li { margin-top: 2px; }
+.school-suggestions li:hover, .school-suggestions li[aria-selected="true"] { background: #e7f2f7; }
+.school-suggestions small { display: block; color: var(--muted); font-size: .75rem; }
 .category, #category { min-width: 0; }
 #category { width: 100%; }
 label { font-weight: 650; }
@@ -753,7 +763,10 @@ button { background: #183745; border-color: #183745; color: #fff; cursor: pointe
   <form id="filters" role="search" aria-label="Localizar escolas">
     <div class="field search">
       <label for="search">Buscar escola</label>
-      <input id="search" type="search" placeholder="Nome, SIGEAM ou código do marco" title="Separe buscas por vírgula para localizar várias escolas" autocomplete="off">
+      <input id="search" type="search" placeholder="Nome, SIGEAM ou código do marco"
+        title="Separe buscas por vírgula para localizar várias escolas" autocomplete="off"
+        role="combobox" aria-autocomplete="list" aria-controls="school-suggestions" aria-expanded="false">
+      <ul id="school-suggestions" class="school-suggestions" role="listbox" aria-label="Escolas encontradas" hidden></ul>
     </div>
     <div class="field">
       <label for="zone">Zona UTM</label>
@@ -829,6 +842,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 const schools = JSON.parse(document.querySelector('#school-data').textContent);
 const marcos = JSON.parse(document.querySelector('#marco-data').textContent);
 const search = document.querySelector('#search');
+const suggestionList = document.querySelector('#school-suggestions');
 const zone = document.querySelector('#zone');
 const category = document.querySelector('#category');
 const status = document.querySelector('#status');
@@ -1093,15 +1107,30 @@ function addMarker(school, point) {
   return marker;
 }
 
-function update(openResult = false) {
-  const terms = search.value.split(/[,;\n]/).map(normalize).filter(Boolean);
-  const matches = indexedSchools.filter(school =>
+let chosenSchoolCode;
+
+function searchTerms() {
+  return search.value.split(/[,;\n]/).map(normalize).filter(Boolean);
+}
+
+function findSchools(terms) {
+  return indexedSchools.filter(school =>
     (!category.value || school.marco.category === category.value) &&
-    (!terms.length || terms.some(term => /^\d+$/.test(term)
-      ? term === school.code
-      : term.split(' ').every(word => school.names.includes(word)) ||
-        normalize(school.marco.id) === term))
+    (chosenSchoolCode ? school.code === chosenSchoolCode :
+      !terms.length || terms.some(term => /^\d+$/.test(term)
+        ? term === school.code
+        : term.split(' ').every(word => school.names.includes(word)) ||
+          normalize(school.marco.id) === term))
   );
+}
+
+function inSelectedZone(point) {
+  return !zone.value || String(point.zone) === zone.value;
+}
+
+function update(openResult = false) {
+  const terms = searchTerms();
+  const matches = findSchools(terms);
   selectMarker();
   markers.clearLayers();
   let schoolCount = 0;
@@ -1109,11 +1138,11 @@ function update(openResult = false) {
   let firstSchool;
   let firstMarco;
   for (const school of matches) {
-    if (!zone.value || String(school.zone) === zone.value) {
+    if (inSelectedZone(school)) {
       firstSchool = addMarker(school, school);
       schoolCount += 1;
     }
-    if (!zone.value || String(school.marco.zone) === zone.value) {
+    if (inSelectedZone(school.marco)) {
       firstMarco = addMarker(school, school.marco);
       marcoCount += 1;
     }
@@ -1121,13 +1150,15 @@ function update(openResult = false) {
   const count = schoolCount + marcoCount;
   status.textContent = count ? schoolCount + (schoolCount === 1 ? ' escola' : ' escolas') + ' · ' +
     marcoCount + (marcoCount === 1 ? ' ponto de marco' : ' pontos de marco') : 'Nenhuma escola ou marco encontrado';
-  if (count) {
+  if (chosenSchoolCode && firstSchool && openResult) {
+    map.setView(firstSchool.getLatLng(), 18, {animate: false});
+  } else if (count) {
     map.fitBounds(markers.getBounds(), {
       padding: [30, 30], maxZoom: matches.length === 1 ? 17 : 14, animate: false
     });
   }
   if (terms.length && matches.length === 1) {
-    const byMarco = terms.includes(normalize(matches[0].marco.id));
+    const byMarco = !chosenSchoolCode && terms.includes(normalize(matches[0].marco.id));
     const marker = byMarco ? firstMarco : firstSchool || firstMarco;
     selectMarker(marker);
     if (openResult) marker?.openPopup();
@@ -1141,14 +1172,94 @@ function refresh(openResult = false) {
   clearTimeout(timer);
   update(openResult);
 }
+let suggestions = [];
+let activeSuggestion = -1;
+
+function closeSuggestions() {
+  suggestionList.hidden = true;
+  search.setAttribute('aria-expanded', 'false');
+  search.removeAttribute('aria-activedescendant');
+  activeSuggestion = -1;
+}
+
+function showSuggestions() {
+  const terms = searchTerms();
+  closeSuggestions();
+  suggestions = terms.length && !chosenSchoolCode ? findSchools(terms).filter(inSelectedZone) : [];
+  suggestionList.replaceChildren();
+  if (!suggestions.length) return;
+  for (const school of suggestions) {
+    const option = document.createElement('li');
+    option.id = 'suggestion-' + school.code;
+    option.setAttribute('role', 'option');
+    option.setAttribute('aria-selected', 'false');
+    option.dataset.schoolCode = school.code;
+    const metadata = document.createElement('small');
+    metadata.textContent = 'SIGEAM ' + school.code + ' · UTM ' + school.zone + 'S';
+    option.append(school.name, metadata);
+    suggestionList.append(option);
+  }
+  suggestionList.hidden = false;
+  search.setAttribute('aria-expanded', 'true');
+}
+
+function chooseSchool(school) {
+  chosenSchoolCode = school.code;
+  search.value = school.name;
+  closeSuggestions();
+  refresh(true);
+}
+
 search.addEventListener('input', () => {
+  chosenSchoolCode = undefined;
+  showSuggestions();
   clearTimeout(timer);
   timer = setTimeout(update, 150);
+});
+search.addEventListener('focus', showSuggestions);
+search.addEventListener('blur', closeSuggestions);
+suggestionList.addEventListener('mousedown', event => {
+  if (event.target.closest('[role="option"]')) event.preventDefault();
+});
+suggestionList.addEventListener('click', event => {
+  const option = event.target.closest('[role="option"]');
+  if (!option) return;
+  const school = suggestions.find(item => item.code === option.dataset.schoolCode);
+  if (school) {
+    chooseSchool(school);
+    search.blur();
+  }
+});
+search.addEventListener('keydown', event => {
+  if (event.isComposing) return;
+  if (event.key === 'Escape' && !suggestionList.hidden) {
+    event.preventDefault();
+    closeSuggestions();
+    return;
+  }
+  if (event.key === 'Enter' && activeSuggestion >= 0) {
+    event.preventDefault();
+    chooseSchool(suggestions[activeSuggestion]);
+    return;
+  }
+  if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+  if (suggestionList.hidden) showSuggestions();
+  if (suggestionList.hidden) return;
+  event.preventDefault();
+  const options = suggestionList.children;
+  if (activeSuggestion >= 0) options[activeSuggestion].setAttribute('aria-selected', 'false');
+  if (event.key === 'ArrowDown') activeSuggestion = Math.min(activeSuggestion + 1, options.length - 1);
+  else activeSuggestion = activeSuggestion < 0 ? options.length - 1 : Math.max(activeSuggestion - 1, 0);
+  const option = options[activeSuggestion];
+  option.setAttribute('aria-selected', 'true');
+  search.setAttribute('aria-activedescendant', option.id);
+  option.scrollIntoView({block: 'nearest'});
 });
 zone.addEventListener('change', () => refresh());
 category.addEventListener('change', () => refresh());
 document.querySelector('#filters').addEventListener('submit', event => {
   event.preventDefault();
+  closeSuggestions();
   refresh(true);
 });
 update();
