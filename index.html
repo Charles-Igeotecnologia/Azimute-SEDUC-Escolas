@@ -687,6 +687,19 @@ form { display: flex; align-items: end; gap: 8px; flex: 1 1 490px; min-width: 0;
 .school-suggestions li + li { margin-top: 2px; }
 .school-suggestions li:hover, .school-suggestions li[aria-selected="true"] { background: #e7f2f7; }
 .school-suggestions small { display: block; color: var(--muted); font-size: .75rem; }
+.school-selection { flex: 1 0 100%; display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.school-selection[hidden] { display: none; }
+.school-selection strong { font-size: .75rem; }
+.school-selection ul {
+  display: flex; flex-wrap: wrap; gap: 4px 8px; max-height: 105px; overflow: auto;
+  min-width: 0; margin: 0; padding: 4px; list-style: none;
+}
+.school-selection button {
+  min-height: 30px; padding: 3px 7px; background: #e7f2f7; color: #183745;
+  border-color: #a6b8c0; font-size: .75rem; font-weight: 500; text-align: left;
+}
+.school-selection button:hover { background: #d2e7f0; }
+.school-selection button[data-filtered] { background: #fff; color: var(--muted); }
 .category, #category { min-width: 0; }
 #category { width: 100%; }
 label { font-weight: 650; }
@@ -752,6 +765,7 @@ button { background: #183745; border-color: #183745; color: #fff; cursor: pointe
   }
   .search { grid-column: 1 / -1; }
   #status { order: 4; flex-basis: 100%; }
+  .school-selection { order: 5; }
   #map .leaflet-control-scale { margin-bottom: 72px; }
   .notice { bottom: 76px; }
 }
@@ -797,6 +811,10 @@ button { background: #183745; border-color: #183745; color: #fff; cursor: pointe
     <span><i class="marco-key marco-hollow" aria-hidden="true"></i> Sem Marco para Implantar</span>
   </div>
   <output id="status" role="status"></output>
+  <div id="school-selection" class="school-selection" hidden>
+    <strong>Selecionadas</strong>
+    <ul aria-label="Escolas selecionadas"></ul>
+  </div>
 </header>
 <main id="map" aria-label="Mapa de localização das escolas">
   <div id="basemap-notice" class="notice" role="status" hidden>Imagem de reserva · Sentinel-2 de 2016</div>
@@ -843,6 +861,8 @@ const schools = JSON.parse(document.querySelector('#school-data').textContent);
 const marcos = JSON.parse(document.querySelector('#marco-data').textContent);
 const search = document.querySelector('#search');
 const suggestionList = document.querySelector('#school-suggestions');
+const schoolSelection = document.querySelector('#school-selection');
+const chosenList = schoolSelection.querySelector('ul');
 const zone = document.querySelector('#zone');
 const category = document.querySelector('#category');
 const status = document.querySelector('#status');
@@ -1099,24 +1119,29 @@ function addMarker(school, point) {
   const title = isSchool ? school.name + ' · Escola ' + school.zone + 'S' :
     point.id + ' · ' + point.category + ' · ' + school.name;
   const icon = L.divIcon({className, iconSize: [diameter, diameter]});
-  const marker = L.marker([point.lat, point.lon], {icon, title, zIndexOffset: isSchool ? 0 : 1000})
+  const chosen = isSchool && chosenSchools.has(school.code);
+  const marker = L.marker([point.lat, point.lon], {icon, title, zIndexOffset: chosen ? 2000 : isSchool ? 0 : 1000})
     .bindPopup(() => popup(school, point), {maxWidth: 280, maxHeight: Math.min(360, Math.max(120, map.getSize().y - 130)), autoPanPaddingTopLeft: [12, 75], autoPanPaddingBottomRight: [12, 16]});
-  marker.on('popupopen', () => selectMarker(marker));
+  marker.on('popupopen', () => {
+    if (!chosenSchools.size) selectMarker(marker);
+  });
   markers.addLayer(marker);
-  marker.getElement().setAttribute('aria-label', title);
+  const element = marker.getElement();
+  element.setAttribute('aria-label', title);
+  if (chosen) element.classList.add('selected-point');
   return marker;
 }
 
-let chosenSchoolCode;
+const chosenSchools = new Map();
 
 function searchTerms() {
   return search.value.split(/[,;\n]/).map(normalize).filter(Boolean);
 }
 
-function findSchools(terms) {
+function findSchools(terms, selection) {
   return indexedSchools.filter(school =>
     (!category.value || school.marco.category === category.value) &&
-    (chosenSchoolCode ? school.code === chosenSchoolCode :
+    (selection ? selection.has(school.code) :
       !terms.length || terms.some(term => /^\d+$/.test(term)
         ? term === school.code
         : term.split(' ').every(word => school.names.includes(word)) ||
@@ -1130,7 +1155,9 @@ function inSelectedZone(point) {
 
 function update(openResult = false) {
   const terms = searchTerms();
-  const matches = findSchools(terms);
+  const matches = findSchools(terms, chosenSchools.size ? chosenSchools : undefined);
+  renderSelection();
+  map.invalidateSize({pan: false, debounceMoveend: true});
   selectMarker();
   markers.clearLayers();
   let schoolCount = 0;
@@ -1150,15 +1177,17 @@ function update(openResult = false) {
   const count = schoolCount + marcoCount;
   status.textContent = count ? schoolCount + (schoolCount === 1 ? ' escola' : ' escolas') + ' · ' +
     marcoCount + (marcoCount === 1 ? ' ponto de marco' : ' pontos de marco') : 'Nenhuma escola ou marco encontrado';
-  if (chosenSchoolCode && firstSchool && openResult) {
+  if (chosenSchools.size === 1 && firstSchool && openResult) {
     map.setView(firstSchool.getLatLng(), 18, {animate: false});
   } else if (count) {
     map.fitBounds(markers.getBounds(), {
       padding: [30, 30], maxZoom: matches.length === 1 ? 17 : 14, animate: false
     });
   }
-  if (terms.length && matches.length === 1) {
-    const byMarco = !chosenSchoolCode && terms.includes(normalize(matches[0].marco.id));
+  if (chosenSchools.size) {
+    if (openResult && chosenSchools.size === 1) firstSchool?.openPopup();
+  } else if (terms.length && matches.length === 1) {
+    const byMarco = terms.includes(normalize(matches[0].marco.id));
     const marker = byMarco ? firstMarco : firstSchool || firstMarco;
     selectMarker(marker);
     if (openResult) marker?.openPopup();
@@ -1185,7 +1214,9 @@ function closeSuggestions() {
 function showSuggestions() {
   const terms = searchTerms();
   closeSuggestions();
-  suggestions = terms.length && !chosenSchoolCode ? findSchools(terms).filter(inSelectedZone) : [];
+  suggestions = terms.length ? findSchools(terms).filter(school =>
+    inSelectedZone(school) && !chosenSchools.has(school.code)
+  ) : [];
   suggestionList.replaceChildren();
   if (!suggestions.length) return;
   for (const school of suggestions) {
@@ -1203,18 +1234,46 @@ function showSuggestions() {
   search.setAttribute('aria-expanded', 'true');
 }
 
+function renderSelection() {
+  schoolSelection.hidden = !chosenSchools.size;
+  chosenList.replaceChildren();
+  for (const school of chosenSchools.values()) {
+    const item = document.createElement('li');
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.dataset.schoolCode = school.code;
+    const filtered = !inSelectedZone(school) ||
+      (category.value && school.marco.category !== category.value);
+    const label = school.name + (filtered ? ' · fora dos filtros' : '');
+    remove.textContent = label + ' ×';
+    remove.setAttribute('aria-label', 'Remover ' + label);
+    remove.toggleAttribute('data-filtered', Boolean(filtered));
+    item.append(remove);
+    chosenList.append(item);
+  }
+}
+
 function chooseSchool(school) {
-  chosenSchoolCode = school.code;
-  search.value = school.name;
-  closeSuggestions();
+  chosenSchools.set(school.code, school);
+  showSuggestions();
+  if (!suggestions.length) search.value = '';
   refresh(true);
 }
 
+chosenList.addEventListener('click', event => {
+  const button = event.target.closest('button[data-school-code]');
+  if (!button) return;
+  const index = [...chosenList.children].indexOf(button.parentElement);
+  chosenSchools.delete(button.dataset.schoolCode);
+  refresh();
+  const next = chosenList.children[index] || chosenList.lastElementChild;
+  (next?.firstElementChild || search).focus();
+});
+
 search.addEventListener('input', () => {
-  chosenSchoolCode = undefined;
   showSuggestions();
   clearTimeout(timer);
-  timer = setTimeout(update, 150);
+  if (!chosenSchools.size) timer = setTimeout(update, 150);
 });
 search.addEventListener('focus', showSuggestions);
 search.addEventListener('blur', closeSuggestions);
@@ -1225,10 +1284,7 @@ suggestionList.addEventListener('click', event => {
   const option = event.target.closest('[role="option"]');
   if (!option) return;
   const school = suggestions.find(item => item.code === option.dataset.schoolCode);
-  if (school) {
-    chooseSchool(school);
-    search.blur();
-  }
+  if (school) chooseSchool(school);
 });
 search.addEventListener('keydown', event => {
   if (event.isComposing) return;
@@ -1237,9 +1293,10 @@ search.addEventListener('keydown', event => {
     closeSuggestions();
     return;
   }
-  if (event.key === 'Enter' && activeSuggestion >= 0) {
+  if (event.key === 'Enter' && !suggestionList.hidden &&
+    (activeSuggestion >= 0 || suggestions.length === 1)) {
     event.preventDefault();
-    chooseSchool(suggestions[activeSuggestion]);
+    chooseSchool(suggestions[Math.max(0, activeSuggestion)]);
     return;
   }
   if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
