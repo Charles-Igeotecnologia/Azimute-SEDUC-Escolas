@@ -711,6 +711,18 @@ button { background: #183745; border-color: #183745; color: #fff; cursor: pointe
 #map .leaflet-control-attribution { max-width: calc(100vw - 10px); }
 .school-dot { box-shadow: 0 0 0 1px #fff; }
 .school-dot:focus-visible { outline-offset: 3px; }
+.selected-point::after {
+  content: ""; position: absolute; inset: -6px; pointer-events: none;
+  border: 2px solid #fff; border-radius: 50%; box-shadow: 0 0 0 2px #183745;
+  animation: selected-point-pulse 1.25s ease-out infinite;
+}
+@keyframes selected-point-pulse {
+  from { transform: scale(1); opacity: 1; }
+  to { transform: scale(2.05); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .selected-point::after { animation: none; }
+}
 .details { font-size: .82rem; min-width: 170px; overflow-wrap: anywhere; }
 .details strong { display: block; margin-bottom: 7px; font-size: .92rem; }
 .details p { margin: 4px 0; }
@@ -1048,6 +1060,23 @@ function popup(school, point) {
   return panel;
 }
 
+let selectedMarker;
+let selectedOffset;
+
+function selectMarker(marker) {
+  if (selectedMarker === marker) return;
+  if (selectedMarker) {
+    selectedMarker.getElement().classList.remove('selected-point');
+    selectedMarker.setZIndexOffset(selectedOffset);
+  }
+  selectedMarker = marker;
+  if (marker) {
+    selectedOffset = marker.options.zIndexOffset;
+    marker.setZIndexOffset(selectedOffset + 2000);
+    marker.getElement().classList.add('selected-point');
+  }
+}
+
 function addMarker(school, point) {
   const isSchool = point === school;
   const className = isSchool ? 'school-dot zone-' + school.zone :
@@ -1058,6 +1087,7 @@ function addMarker(school, point) {
   const icon = L.divIcon({className, iconSize: [diameter, diameter]});
   const marker = L.marker([point.lat, point.lon], {icon, title, zIndexOffset: isSchool ? 0 : 1000})
     .bindPopup(() => popup(school, point), {maxWidth: 280, maxHeight: Math.min(360, Math.max(120, map.getSize().y - 130)), autoPanPaddingTopLeft: [12, 75], autoPanPaddingBottomRight: [12, 16]});
+  marker.on('popupopen', () => selectMarker(marker));
   markers.addLayer(marker);
   marker.getElement().setAttribute('aria-label', title);
   return marker;
@@ -1072,6 +1102,7 @@ function update(openResult = false) {
       : term.split(' ').every(word => school.names.includes(word)) ||
         normalize(school.marco.id) === term))
   );
+  selectMarker();
   markers.clearLayers();
   let schoolCount = 0;
   let marcoCount = 0;
@@ -1095,10 +1126,11 @@ function update(openResult = false) {
       padding: [30, 30], maxZoom: matches.length === 1 ? 17 : 14, animate: false
     });
   }
-  if (openResult && matches.length === 1) {
+  if (terms.length && matches.length === 1) {
     const byMarco = terms.includes(normalize(matches[0].marco.id));
     const marker = byMarco ? firstMarco : firstSchool || firstMarco;
-    marker?.openPopup();
+    selectMarker(marker);
+    if (openResult) marker?.openPopup();
   }
 }
 
