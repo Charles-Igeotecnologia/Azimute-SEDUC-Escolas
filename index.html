@@ -670,16 +670,16 @@ svg.leaflet-image-layer.leaflet-interactive path {
 :root { color-scheme: light; font-family: system-ui, sans-serif; color: #162933; --line: #d8e1e4; --muted: #46616e; --yellow: #ffd348; --blue: #2472c8; }
 * { box-sizing: border-box; }
 body { margin: 0; height: 100vh; height: 100dvh; display: grid; grid-template-rows: auto minmax(0, 1fr); }
-header { padding: 12px 24px; display: flex; align-items: center; gap: 24px; flex-wrap: wrap; border-bottom: 1px solid var(--line); background: #fff; z-index: 500; }
+header { position: relative; padding: 12px 24px; display: flex; align-items: center; gap: 12px 20px; flex-wrap: wrap; border-bottom: 1px solid var(--line); background: #fff; z-index: 500; }
 .brand { display: grid; gap: 2px; flex-shrink: 0; }
 h1 { margin: 0; font-size: 1.25rem; line-height: 1.1; letter-spacing: .07em; }
 .subtitle, label, #status { font-size: .75rem; color: var(--muted); }
-form { display: flex; align-items: end; gap: 8px; flex: 1 1 490px; min-width: 0; margin: 0; max-width: 640px; }
+form { display: flex; align-items: end; gap: 8px; flex: 1 1 290px; min-width: 0; margin: 0; max-width: 440px; }
 .field { display: grid; gap: 4px; }
 .search { flex: 1; min-width: 0; position: relative; }
 .school-suggestions {
   position: absolute; top: calc(100% + 4px); left: 0; width: min(340px, calc(100vw - 24px));
-  z-index: 1; max-height: min(280px, 40vh); overflow: auto; overscroll-behavior: contain;
+  z-index: 3; max-height: min(280px, 40dvh); overflow: auto; overscroll-behavior: contain;
   margin: 0; padding: 4px; list-style: none; background: #fff;
   border: 1px solid #a6b8c0; border-radius: 6px; box-shadow: 0 4px 12px #18374524;
 }
@@ -687,7 +687,7 @@ form { display: flex; align-items: end; gap: 8px; flex: 1 1 490px; min-width: 0;
 .school-suggestions li + li { margin-top: 2px; }
 .school-suggestions li:hover, .school-suggestions li[aria-selected="true"] { background: #e7f2f7; }
 .school-suggestions small { display: block; color: var(--muted); font-size: .75rem; }
-.school-selection { flex: 1 0 100%; display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.school-selection { order: 2; flex: 1 0 100%; display: flex; align-items: baseline; gap: 8px; min-width: 0; }
 .school-selection[hidden] { display: none; }
 .school-selection strong { font-size: .75rem; }
 .school-selection ul {
@@ -708,6 +708,8 @@ input { width: 100%; }
 button { background: #183745; border-color: #183745; color: #fff; cursor: pointer; font-weight: 650; }
 :focus-visible { outline: 3px solid #176cbe; outline-offset: 2px; }
 .basemap-field { flex: 0 0 auto; }
+.map-options { display: contents; }
+.options-toggle { display: none; }
 .reference-label span {
   position: absolute; transform: translate(-50%, -50%); white-space: nowrap;
   color: #fff; font: 600 11px system-ui, sans-serif;
@@ -729,8 +731,8 @@ button { background: #183745; border-color: #183745; color: #fff; cursor: pointe
 .marco-dot:focus-visible { outline-offset: 3px; }
 .zone-20 { --point: var(--yellow); }
 .zone-21 { --point: var(--blue); }
-#status { min-width: 76px; font-variant-numeric: tabular-nums; }
-#map { background: #e6edef; min-width: 0; }
+#status { order: 1; min-width: 76px; font-variant-numeric: tabular-nums; }
+#map { background: #e6edef; min-width: 0; isolation: isolate; }
 #map .leaflet-control-attribution { max-width: calc(100vw - 10px); }
 .school-dot { box-shadow: 0 0 0 1px #fff; }
 .school-dot:focus-visible { outline-offset: 3px; }
@@ -756,18 +758,51 @@ button { background: #183745; border-color: #183745; color: #fff; cursor: pointe
 .marco-table th { color: var(--muted); padding-right: 9px; white-space: nowrap; }
 .details .google-maps-link { display: inline-block; margin-top: 8px; font-weight: 650; text-decoration: underline; }
 .notice { position: absolute; bottom: 48px; left: 50%; transform: translateX(-50%); z-index: 450; background: white; border: 1px solid var(--line); border-radius: 6px; padding: 7px 12px; font-size: .8rem; max-width: calc(100% - 30px); text-align: center; }
-@media (max-width: 720px) {
-  header { padding: 10px 12px; gap: 10px 14px; }
-  .brand { flex: 1; }
-  form {
-    order: 3; max-width: none; flex-basis: 100%;
-    display: grid; grid-template-columns: auto minmax(0, 1fr) auto;
+@media (max-width: 760px), (max-height: 500px) and (orientation: landscape) {
+  header {
+    display: grid; grid-template-columns: minmax(0, 1fr) auto;
+    gap: 6px 8px; padding: 6px 10px;
   }
-  .search { grid-column: 1 / -1; }
-  #status { order: 4; flex-basis: 100%; }
-  .school-selection { order: 5; }
-  #map .leaflet-control-scale { margin-bottom: 72px; }
-  .notice { bottom: 76px; }
+  .brand h1 { font-size: 1rem; letter-spacing: .04em; }
+  .brand .subtitle { display: none; }
+  #filters { grid-column: 1 / -1; grid-row: 2; max-width: none; }
+  #filters .search label {
+    position: absolute; width: 1px; height: 1px; overflow: hidden;
+    clip-path: inset(50%); white-space: nowrap;
+  }
+  #search { font-size: 16px; }
+  .options-toggle {
+    display: block; grid-column: 2; grid-row: 1; white-space: nowrap;
+    background: #fff; color: #183745;
+  }
+  .options-toggle[aria-expanded="true"] { background: #e7f2f7; }
+  #status { grid-column: 1 / -1; grid-row: 3; }
+  .map-options {
+    display: none; position: absolute; z-index: 2; top: calc(100% + 4px); right: 8px;
+    width: min(360px, calc(100vw - 16px)); max-height: min(450px, 62dvh);
+    padding: 12px; gap: 12px; overflow: auto; overscroll-behavior: contain;
+    background: #fff; border: 1px solid #a6b8c0; border-radius: 6px;
+    box-shadow: 0 4px 12px #18374524;
+  }
+  .map-options[data-open] { display: grid; grid-template-columns: auto minmax(0, 1fr); }
+  .map-options .basemap-field, .map-options .legend, .map-options .school-selection { grid-column: 1 / -1; }
+  .map-options .legend, .map-options .school-selection { border-top: 1px solid var(--line); padding-top: 8px; }
+  .map-options .school-selection { display: grid; gap: 4px; }
+  .map-options .school-selection[hidden] { display: none; }
+  .map-options .school-selection ul { display: grid; max-height: none; overflow: visible; }
+  .map-options .school-selection button { width: 100%; min-height: 38px; }
+  #map .leaflet-control-attribution { font-size: 10px; line-height: 1.25; }
+  #map .leaflet-control-scale { margin-bottom: 46px; }
+  .notice { bottom: 52px; }
+}
+@media (max-width: 360px) {
+  .map-options[data-open] { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-height: 500px) and (orientation: landscape) {
+  header { grid-template-columns: auto minmax(0, 1fr) auto; }
+  #filters { grid-column: 2; grid-row: 1; }
+  .options-toggle { grid-column: 3; grid-row: 1; align-self: end; }
+  #status { grid-row: 2; }
 }
 </style>
 </head>
@@ -782,6 +817,11 @@ button { background: #183745; border-color: #183745; color: #fff; cursor: pointe
         role="combobox" aria-autocomplete="list" aria-controls="school-suggestions" aria-expanded="false">
       <ul id="school-suggestions" class="school-suggestions" role="listbox" aria-label="Escolas encontradas" hidden></ul>
     </div>
+    <button type="submit">Buscar</button>
+  </form>
+  <button id="options-toggle" class="options-toggle" type="button" aria-expanded="false"
+    aria-controls="map-options">Opções</button>
+  <section id="map-options" class="map-options" aria-label="Filtros, bases, legenda e escolas selecionadas">
     <div class="field">
       <label for="zone">Zona UTM</label>
       <select id="zone"><option value="">Todas</option><option value="20">20S</option><option value="21">21S</option></select>
@@ -794,27 +834,26 @@ button { background: #183745; border-color: #183745; color: #fff; cursor: pointe
         <option>Sem Marco para Implantar</option>
       </select>
     </div>
-    <button type="submit">Buscar</button>
-  </form>
-  <div class="field basemap-field">
-    <label for="basemap">Base de mapas</label>
-    <select id="basemap">
-      <option value="satellite">Satélite Esri</option>
-      <option value="hybrid">Híbrida · ruas e nomes</option>
-      <option value="offline">Satélite offline</option>
-    </select>
-  </div>
-  <div class="legend" aria-label="Legenda de escolas por zona UTM e pontos de marco por categoria">
-    <span><i class="zone-20" aria-hidden="true"></i> Escola 20S</span>
-    <span><i class="zone-21" aria-hidden="true"></i> Escola 21S</span>
-    <span><i class="marco-key" aria-hidden="true"></i> Implantar o Marco</span>
-    <span><i class="marco-key marco-hollow" aria-hidden="true"></i> Sem Marco para Implantar</span>
-  </div>
+    <div class="field basemap-field">
+      <label for="basemap">Base de mapas</label>
+      <select id="basemap">
+        <option value="satellite">Satélite Esri</option>
+        <option value="hybrid">Híbrida · ruas e nomes</option>
+        <option value="offline">Satélite offline</option>
+      </select>
+    </div>
+    <div class="legend" aria-label="Legenda de escolas por zona UTM e pontos de marco por categoria">
+      <span><i class="zone-20" aria-hidden="true"></i> Escola 20S</span>
+      <span><i class="zone-21" aria-hidden="true"></i> Escola 21S</span>
+      <span><i class="marco-key" aria-hidden="true"></i> Implantar o Marco</span>
+      <span><i class="marco-key marco-hollow" aria-hidden="true"></i> Sem Marco para Implantar</span>
+    </div>
+    <div id="school-selection" class="school-selection" hidden>
+      <strong>Selecionadas</strong>
+      <ul aria-label="Escolas selecionadas"></ul>
+    </div>
+  </section>
   <output id="status" role="status"></output>
-  <div id="school-selection" class="school-selection" hidden>
-    <strong>Selecionadas</strong>
-    <ul aria-label="Escolas selecionadas"></ul>
-  </div>
 </header>
 <main id="map" aria-label="Mapa de localização das escolas">
   <div id="basemap-notice" class="notice" role="status" hidden>Imagem de reserva · Sentinel-2 de 2016</div>
@@ -863,6 +902,8 @@ const search = document.querySelector('#search');
 const suggestionList = document.querySelector('#school-suggestions');
 const schoolSelection = document.querySelector('#school-selection');
 const chosenList = schoolSelection.querySelector('ul');
+const optionsToggle = document.querySelector('#options-toggle');
+const mapOptions = document.querySelector('#map-options');
 const zone = document.querySelector('#zone');
 const category = document.querySelector('#category');
 const status = document.querySelector('#status');
@@ -1111,6 +1152,19 @@ function selectMarker(marker) {
   }
 }
 
+function popupLayout() {
+  const size = map.getSize();
+  const attributionHeight = map.attributionControl.getContainer().offsetHeight;
+  const top = 75;
+  const bottom = Math.max(16, attributionHeight + 12);
+  return {
+    maxWidth: Math.min(280, size.x - 65),
+    maxHeight: Math.min(360, Math.max(85, size.y - top - bottom - 30)),
+    autoPanPaddingTopLeft: [12, top],
+    autoPanPaddingBottomRight: [12, bottom]
+  };
+}
+
 function addMarker(school, point) {
   const isSchool = point === school;
   const className = isSchool ? 'school-dot zone-' + school.zone :
@@ -1121,7 +1175,7 @@ function addMarker(school, point) {
   const icon = L.divIcon({className, iconSize: [diameter, diameter]});
   const chosen = isSchool && chosenSchools.has(school.code);
   const marker = L.marker([point.lat, point.lon], {icon, title, zIndexOffset: chosen ? 2000 : isSchool ? 0 : 1000})
-    .bindPopup(() => popup(school, point), {maxWidth: 280, maxHeight: Math.min(360, Math.max(120, map.getSize().y - 130)), autoPanPaddingTopLeft: [12, 75], autoPanPaddingBottomRight: [12, 16]});
+    .bindPopup(() => popup(school, point), popupLayout());
   marker.on('popupopen', () => {
     if (!chosenSchools.size) selectMarker(marker);
   });
@@ -1157,9 +1211,9 @@ function update(openResult = false) {
   const terms = searchTerms();
   const matches = findSchools(terms, chosenSchools.size ? chosenSchools : undefined);
   renderSelection();
-  map.invalidateSize({pan: false, debounceMoveend: true});
   selectMarker();
   markers.clearLayers();
+  map.invalidateSize({pan: false, debounceMoveend: true});
   let schoolCount = 0;
   let marcoCount = 0;
   let firstSchool;
@@ -1235,6 +1289,7 @@ function showSuggestions() {
 }
 
 function renderSelection() {
+  optionsToggle.textContent = chosenSchools.size ? 'Opções · ' + chosenSchools.size : 'Opções';
   schoolSelection.hidden = !chosenSchools.size;
   chosenList.replaceChildren();
   for (const school of chosenSchools.values()) {
@@ -1275,7 +1330,26 @@ search.addEventListener('input', () => {
   clearTimeout(timer);
   if (!chosenSchools.size) timer = setTimeout(update, 150);
 });
-search.addEventListener('focus', showSuggestions);
+function setOptionsOpen(open) {
+  mapOptions.toggleAttribute('data-open', open);
+  optionsToggle.setAttribute('aria-expanded', String(open));
+}
+
+optionsToggle.addEventListener('click', () => setOptionsOpen(!mapOptions.hasAttribute('data-open')));
+document.addEventListener('pointerdown', event => {
+  if (mapOptions.hasAttribute('data-open') && !mapOptions.contains(event.target) &&
+    !optionsToggle.contains(event.target)) setOptionsOpen(false);
+});
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape' && mapOptions.hasAttribute('data-open')) {
+    setOptionsOpen(false);
+    if (optionsToggle.offsetParent) optionsToggle.focus();
+  }
+});
+search.addEventListener('focus', () => {
+  setOptionsOpen(false);
+  showSuggestions();
+});
 search.addEventListener('blur', closeSuggestions);
 suggestionList.addEventListener('mousedown', event => {
   if (event.target.closest('[role="option"]')) event.preventDefault();
@@ -1311,6 +1385,18 @@ search.addEventListener('keydown', event => {
   option.setAttribute('aria-selected', 'true');
   search.setAttribute('aria-activedescendant', option.id);
   option.scrollIntoView({block: 'nearest'});
+});
+map.on('resize', () => {
+  const visibleMarkers = markers.getLayers();
+  if (!visibleMarkers.length) return;
+  const layout = popupLayout();
+  for (const marker of visibleMarkers) {
+    L.setOptions(marker.getPopup(), layout);
+    if (marker.isPopupOpen()) marker.getPopup().update();
+  }
+  if (chosenSchools.size > 1) {
+    map.fitBounds(markers.getBounds(), {padding: [30, 30], maxZoom: 14, animate: false});
+  }
 });
 zone.addEventListener('change', () => refresh());
 category.addEventListener('change', () => refresh());
