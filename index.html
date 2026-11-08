@@ -690,12 +690,12 @@ form { display: flex; align-items: end; gap: 8px; flex: 1 1 290px; min-width: 0;
 .school-selection { order: 2; flex: 1 0 100%; display: flex; align-items: baseline; gap: 8px; min-width: 0; }
 .school-selection[hidden] { display: none; }
 .school-selection strong { font-size: .75rem; }
-.selection-actions { display: grid; gap: 5px; flex: 0 1 240px; }
-.school-selection .selection-zip {
+.selection-actions { order: 1; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.selection-actions .selection-zip {
   width: fit-content; padding-inline: 10px; background: #183745; color: #fff; font-weight: 650;
 }
-.school-selection .selection-zip:hover { background: #245266; }
-.school-selection .selection-zip:disabled { background: #e7f2f7; color: #46616e; cursor: default; }
+.selection-actions .selection-zip:hover { background: #245266; }
+.selection-actions .selection-zip:disabled { background: #e7f2f7; color: #46616e; cursor: default; }
 .zip-status { font-size: .75rem; color: var(--muted); }
 .school-selection ul {
   display: flex; flex-wrap: wrap; gap: 4px 8px; max-height: 105px; overflow: auto;
@@ -738,7 +738,7 @@ button { background: #183745; border-color: #183745; color: #fff; cursor: pointe
 .marco-dot:focus-visible { outline-offset: 3px; }
 .zone-20 { --point: var(--yellow); }
 .zone-21 { --point: var(--blue); }
-#status { order: 1; min-width: 76px; font-variant-numeric: tabular-nums; }
+#status { min-width: 76px; font-variant-numeric: tabular-nums; }
 #map { background: #e6edef; min-width: 0; isolation: isolate; }
 #map .leaflet-control-attribution { max-width: calc(100vw - 10px); }
 .school-dot { box-shadow: 0 0 0 1px #fff; }
@@ -822,7 +822,7 @@ button { background: #183745; border-color: #183745; color: #fff; cursor: pointe
     background: #fff; color: #183745;
   }
   .options-toggle[aria-expanded="true"] { background: #e7f2f7; }
-  #status { grid-column: 1 / -1; grid-row: 3; }
+  .selection-actions { grid-column: 1 / -1; grid-row: 3; }
   .map-options {
     display: none; position: absolute; z-index: 2; top: calc(100% + 4px); right: 8px;
     width: min(360px, calc(100vw - 16px)); max-height: min(450px, 62dvh);
@@ -848,7 +848,7 @@ button { background: #183745; border-color: #183745; color: #fff; cursor: pointe
   header { grid-template-columns: auto minmax(0, 1fr) auto; }
   #filters { grid-column: 2; grid-row: 1; }
   .options-toggle { grid-column: 3; grid-row: 1; align-self: end; }
-  #status { grid-row: 2; }
+  .selection-actions { grid-row: 2; }
 }
 </style>
 </head>
@@ -895,15 +895,15 @@ button { background: #183745; border-color: #183745; color: #fff; cursor: pointe
       <span><i class="marco-key marco-hollow" aria-hidden="true"></i> Sem Marco para Implantar</span>
     </div>
     <div id="school-selection" class="school-selection" hidden>
-      <div class="selection-actions">
-        <strong>Selecionadas</strong>
-        <button id="selection-zip" class="selection-zip" type="button">Baixar plantas (ZIP)</button>
-        <output id="zip-status" class="zip-status" role="status"></output>
-      </div>
+      <strong>Selecionadas</strong>
       <ul aria-label="Escolas selecionadas"></ul>
     </div>
   </section>
-  <output id="status" role="status"></output>
+  <div class="selection-actions">
+    <output id="status" role="status"></output>
+    <button id="selection-zip" class="selection-zip" type="button" aria-describedby="zip-status" disabled>Baixar plantas (ZIP)</button>
+    <output id="zip-status" class="zip-status" role="status">Selecione uma escola nas sugestões da busca.</output>
+  </div>
 </header>
 <main id="map" aria-label="Mapa de localização das escolas">
   <div id="basemap-notice" class="notice" role="status" hidden>Imagem de reserva · Sentinel-2 de 2016</div>
@@ -1580,12 +1580,15 @@ zipButton.addEventListener('click', async () => {
     zipStatus.textContent = 'O ZIP não pôde ser gerado. Tente novamente.';
   } finally {
     zipInProgress = false;
-    zipButton.disabled = false;
+    zipButton.disabled = !chosenSchools.size;
   }
 });
 
 function renderSelection() {
-  zipButton.disabled = zipInProgress;
+  zipButton.disabled = zipInProgress || !chosenSchools.size;
+  if (!zipInProgress && !chosenSchools.size) {
+    zipStatus.textContent = 'Selecione uma escola nas sugestões da busca.';
+  }
   optionsToggle.textContent = chosenSchools.size ? 'Opções · ' + chosenSchools.size : 'Opções';
   schoolSelection.hidden = !chosenSchools.size;
   chosenList.replaceChildren();
