@@ -908,6 +908,7 @@ button { background: #183745; border-color: #183745; color: #fff; cursor: pointe
           <button id="plant-zoom-in" type="button" aria-label="Aumentar zoom">+</button>
         </div>
         <button id="plant-fullscreen" type="button" aria-pressed="false">Tela cheia</button>
+        <a id="plant-download-link" target="_blank" rel="noopener noreferrer">Baixar PDF</a>
         <a id="plant-drive-link" target="_blank" rel="noopener noreferrer">Abrir no Google Drive</a>
         <button id="plant-close" type="button" autofocus>Fechar</button>
       </div>
@@ -964,6 +965,7 @@ const plantPanel = document.querySelector('#plant-viewer-panel');
 const plantTitle = document.querySelector('#plant-viewer-title');
 const plantFrame = document.querySelector('#plant-frame');
 const plantDriveLink = document.querySelector('#plant-drive-link');
+const plantDownloadLink = document.querySelector('#plant-download-link');
 const plantFullscreen = document.querySelector('#plant-fullscreen');
 const plantViewport = document.querySelector('#plant-viewport');
 const plantZoomOut = document.querySelector('#plant-zoom-out');
@@ -1195,6 +1197,11 @@ function openPlant(school, planta) {
   plantTitle.textContent = 'Planta · ' + school.name;
   plantFrame.title = 'Planta em PDF de ' + school.name;
   plantDriveLink.href = planta.url;
+  const fileUrl = new URL(planta.url);
+  const fileId = fileUrl.pathname.split('/')[3];
+  const downloadUrl = new URL('/uc', fileUrl);
+  downloadUrl.search = new URLSearchParams({export: 'download', id: fileId});
+  plantDownloadLink.href = downloadUrl.href;
   plantViewer.showModal();
   setPlantZoom(100);
   plantFrame.src = planta.url.substring(0, planta.url.lastIndexOf('/') + 1) + 'preview';
